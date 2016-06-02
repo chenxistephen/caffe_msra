@@ -1,4 +1,5 @@
 #include <assert.h>
+#define NOMINMAX
 #include <Windows.h>
 #include <string>
 

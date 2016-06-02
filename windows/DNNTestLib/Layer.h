@@ -40,6 +40,12 @@ namespace DNNTestLib
 		virtual int GetInputPadX();  // the required padding size of input layers.
 		virtual int GetInputPadY();
 		virtual void InitActs();
+		// Added by Stephen Chen
+		virtual CPUData* GetWeight() const { return NULL; }
+		virtual CPUData* GetBias() const { return NULL; }
+		virtual void CopyWeight(float *buffer, int buffer_size) const{}
+		virtual void CopyBias(float *buffer, int buffer_size) const{}
+		/////////////////////////////////////
 		virtual ~Layer();
 
 	protected:

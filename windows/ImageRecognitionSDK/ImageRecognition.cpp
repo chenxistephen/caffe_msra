@@ -80,7 +80,10 @@ HRESULT CImageRecognition::LoadModel(const std::string &modelConfigFile, const i
 		ReadVariable(strSegmentationModel);
 	}
 	EndReadConfigure();
-
+	//m_imageSizeOps.bConstrainLongEdge = false;
+	//m_imageSizeOps.iImgSizeConstraint = 600;
+	//strSharedConvolutionModel = "E:/chenxi/ImageUnderstanding/private/caffe/examples/ZF/Cloth_feature_map_new.bin";
+	//strDetectionModel = "E:/chenxi/ImageUnderstanding/private/caffe/examples/ZF/Cloth_detection_new.bin";
 	if (DNNTestLib::ThrowException(DNNTestLib::ConfigFileError, "m_imageSizeOps.iImgSizeConstraint must > 0!", (m_imageSizeOps.iImgSizeConstraint > 0))) return E_INVALIDARG;
 	if (DNNTestLib::ThrowException(DNNTestLib::ConfigFileError, "Missing SharedConvolution model config!", tasks && !strSharedConvolutionModel.empty())) return E_INVALIDARG;
 	if (DNNTestLib::ThrowException(DNNTestLib::ConfigFileError, "Missing Classification model config!", ((tasks & IUTask_Classification) != IUTask_Classification) || !strClassificationModel.empty())) return E_INVALIDARG;

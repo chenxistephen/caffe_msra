@@ -68,7 +68,7 @@ namespace DNNTestLib
 		int m_iMaxEvalutedCandidate = 2000;
 		int m_iMaxOuputNum = 500;
 
-	private:		
+	public://private:		
 		void BoxPredictInverse_delta(RECTReal &output, const RECTReal &predict, const RECTReal &src);
 		void BoxPredictInverse_bbox(RECTReal &output, const RECTReal &predict, const RECTReal &src);
 

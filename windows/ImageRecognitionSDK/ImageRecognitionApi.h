@@ -5,7 +5,7 @@
 #else
 #define IMAGERECOGNITIONAPI extern "C" __declspec(dllimport)
 #endif
-
+#define NOMINMAX
 #include <Windows.h>
 
 // support tasks (multiple choice)

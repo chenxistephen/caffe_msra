@@ -11,6 +11,11 @@
 #include "caffe/common.hpp"
 #include "caffe/layer.hpp"
 #include "caffe/proto/caffe.pb.h"
+// Added by Stephen Chen
+#include <Windows.h>
+// Added by Stephen Chen
+#include "../DNNTestLib/DNNTester.h"
+
 
 namespace caffe {
 
@@ -114,6 +119,9 @@ class Net {
   void CopyTrainedLayersFrom(const string trained_filename);
   void CopyTrainedLayersFromBinaryProto(const string trained_filename);
   void CopyTrainedLayersFromHDF5(const string trained_filename);
+  // Added by Stephen Chen 5/31
+  void CopyTrainedLayersFromBinFile(const string trained_filename);  
+  void CopyMSRAParams(const std::vector<DNNTestLib::Layer*>& layers);
   /// @brief Writes the net to a proto.
   void ToProto(NetParameter* param, bool write_diff = false) const;
   /// @brief Writes the net to an HDF5 file.
@@ -209,6 +217,25 @@ class Net {
   inline const vector<int>& output_blob_indices() const {
     return net_output_blob_indices_;
   }
+  //////////////////////////////////// Added by Stephen Chen 5/31 //////////////////////////////////////////
+  wchar_t* CharToWchar(const char* c)
+  {
+	  int len = MultiByteToWideChar(CP_ACP, 0, c, strlen(c), NULL, 0);
+	  wchar_t* m_wchar = new wchar_t[len + 1];
+	  MultiByteToWideChar(CP_ACP, 0, c, strlen(c), m_wchar, len);
+	  m_wchar[len] = '\0';
+	  return m_wchar;
+  }
+
+  vector<wchar_t> CharToWcharVector(const char* c)
+  {
+	  int len = MultiByteToWideChar(CP_ACP, 0, c, strlen(c), NULL, 0);
+	  vector<wchar_t> m_wchar(len + 1);
+	  MultiByteToWideChar(CP_ACP, 0, c, strlen(c), &m_wchar[0], len);
+	  m_wchar[len] = '\0';
+	  return m_wchar;
+  }
+  //////////////////////////////////////////////////////////////////////////////
   bool has_blob(const string& blob_name) const;
   const shared_ptr<Blob<Dtype> > blob_by_name(const string& blob_name) const;
   bool has_layer(const string& layer_name) const;

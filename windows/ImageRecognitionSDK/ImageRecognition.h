@@ -95,7 +95,7 @@ private:
 
 	static bool wstring2string(__in const std::wstring &wstr, __out std::string &str);
 
-private:
+public://private:
 	ImageSizeOpts m_imageSizeOps;
 
 	CImageFeatureMap m_featureMap;

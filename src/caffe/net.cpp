@@ -19,6 +19,24 @@
 
 #include "caffe/test/test_caffe_main.hpp"
 
+// Added by Stephen Chen
+#include "vtcore.h"
+#include "../DNNTestLib/NetUtils.h"
+#include "../DNNTestLib/CPUData.h"
+#include "../detection/spm_pool/spm_pool.h"
+#include "ImageFeatureMap.h"
+#include "ImageClassifier.h"
+#include "ImageObjectDetector.h"
+#include "ImageSegmentation.h"
+#include "ImageRecognition.h"
+#include "ImageRecognitionApi.h"
+
+#include "ReadConfigure.h"
+#include "Path.h"
+#include "Directory.h"
+#include "../DNNTestLib/Blas.h"
+
+
 namespace caffe {
 
 template <typename Dtype>
@@ -125,7 +143,7 @@ void Net<Dtype>::Init(const NetParameter& in_param) {
     Layer<Dtype>* layer = layers_[layer_id].get();
     if (layer->AutoTopBlobs()) {
       const int needed_num_top =
-          std::max(layer->MinTopBlobs(), layer->ExactNumTopBlobs());
+          (std::max)(layer->MinTopBlobs(), layer->ExactNumTopBlobs());
       for (; num_top < needed_num_top; ++num_top) {
         // Add "anonymous" top blobs -- do not modify available_blobs or
         // blob_name_to_idx as we don't want these blobs to be usable as input
@@ -844,7 +862,13 @@ void Net<Dtype>::CopyTrainedLayersFrom(const string trained_filename) {
   if (trained_filename.size() >= 3 &&
       trained_filename.compare(trained_filename.size() - 3, 3, ".h5") == 0) {
     CopyTrainedLayersFromHDF5(trained_filename);
-  } else {
+  }
+  // Added by Stephen Chen 5/31/2016
+  else if (trained_filename.size() >= 4 && trained_filename.compare(trained_filename.size() - 4, 4, ".txt") == 0)
+  {
+	  CopyTrainedLayersFromBinFile(trained_filename);
+  }
+  else {
     CopyTrainedLayersFromBinaryProto(trained_filename);
   }
 }
@@ -905,6 +929,293 @@ void Net<Dtype>::CopyTrainedLayersFromHDF5(const string trained_filename) {
   }
   H5Gclose(data_hid);
   H5Fclose(file_hid);
+}
+
+// Added by Stephen Chen 5/31
+template <typename Dtype>
+void Net<Dtype>::CopyMSRAParams(const std::vector<DNNTestLib::Layer*>& layers)
+{
+	const int num_layers = layers.size();
+	for (int i = 0; i < num_layers; i++)
+	{
+		DNNTestLib::Layer* layer = layers[i];
+		string layerType = layer->GetType();
+		string source_layer_name = layer->GetName();
+		int channels, width, height, num;
+		layer->GetResponseDim(&channels, &width, &height, &num);
+		std::cout << "Name:" << source_layer_name << ",  Output: (channels, width, height, num)= (" << channels << "," << width << "," << height << "," << num << ")" << std::endl;
+		cout << "Type:" << layerType << endl;
+		float* weights;
+		if (layerType == "conv" || layerType == "fc")
+		{
+			int weight_size = layer->GetWeight()->GetDataSize();
+			int wchan, wwid, wheight, wnum;
+			wchan = layer->GetWeight()->GetChannels(); wwid = layer->GetWeight()->GetWidth(); wheight = layer->GetWeight()->GetHeight(); wnum = layer->GetWeight()->GetNum();
+			DNNTestLib::CPUData* src_weight = layer->GetWeight();
+			DNNTestLib::CPUData* src_bias = layer->GetBias();
+			int bchan, bwid, bheight, bnum;
+			bchan = layer->GetBias()->GetChannels(); bwid = layer->GetBias()->GetWidth(); bheight = layer->GetBias()->GetHeight(); bnum = layer->GetBias()->GetNum();
+			std::cout << "Type:" << layerType << ":  Weight: (channels, width, height, num)= (" << wchan << "," << wwid << "," << wheight << "," << wnum << ")" << std::endl;
+			float* weight_buffer = new float[weight_size];
+			layer->CopyWeight(weight_buffer, weight_size);
+			int bias_size = layer->GetBias()->GetDataSize();
+			float* bias_buffer = new float[bias_size];
+			layer->CopyBias(bias_buffer, bias_size);
+			////////////////////////////////////////////////////////////////////////////////////////
+			// Copying to Caffe NetParameters
+			////////////////////////////////////////////////////////////////////////////////////////
+			if (!layer_names_index_.count(source_layer_name)) {
+				LOG(INFO) << "Ignoring source layer " << source_layer_name;
+				continue;
+			}
+			int target_layer_id = layer_names_index_[source_layer_name];
+			DLOG(INFO) << "Copying source layer " << source_layer_name;
+			vector<shared_ptr<Blob<Dtype> > >& target_blobs =
+				layers_[target_layer_id]->blobs();
+			for (int j = 0; j < target_blobs.size(); ++j) {
+				shared_ptr<Blob<Dtype>>& targetBlobPtr = target_blobs[j];
+				Blob<Dtype>* targetBlob = targetBlobPtr.get();
+				int target_size = targetBlob->num()*targetBlob->channels()*targetBlob->height()*targetBlob->width();
+				Dtype* data_vec = targetBlob->mutable_cpu_data();
+				if (j == 0)// weights
+				{
+					CHECK_EQ(target_size, weight_size);
+					cout << "Storage Type: " << src_weight->GetDataStorageType() << endl;
+					for (int n = 0; n < wnum; n++)
+					{
+						for (int c = 0; c < wchan; c++)
+						{
+							for (int h = 0; h < wheight; h++)
+							{
+								for (int w = 0; w < wwid; w++)
+								{
+									int tid = targetBlob->offset(n, c, h, w);
+									int sid = src_weight->Offset(n, c, w, h);
+									data_vec[tid] = weight_buffer[sid];
+								}
+							}
+						}
+					}
+					//for (int i = 0; i < targetBlob->count(); ++i)
+					//	data_vec[i] = weight_buffer[i];
+				}
+				else if (j == 1) //bias
+				{
+					CHECK_EQ(target_size, bias_size);
+					cout << "Storage Type: " << src_bias->GetDataStorageType() << endl;
+					for (int n = 0; n < bnum; n++)
+					{
+						for (int c = 0; c < bchan; c++)
+						{
+							for (int h = 0; h < bheight; h++)
+							{
+								for (int w = 0; w < bwid; w++)
+								{
+									int tid = targetBlob->offset(n, c, h, w);
+									int sid = src_bias->Offset(n, c, w, h);
+									data_vec[tid] = bias_buffer[sid];
+								}
+							}
+						}
+					}
+					//for (int i = 0; i < targetBlob->count(); ++i)
+					//	data_vec[i] = bias_buffer[i];
+				}
+			}
+		}
+	}
+}
+
+template <typename Dtype>
+void Net<Dtype>::CopyTrainedLayersFromBinFile(const string trained_filename) {
+	HRESULT hr = S_OK;
+	intptr_t handle;
+	hr = IUCreateHandle(handle);
+	hr = IUSetNumThreads(handle, 1);
+	//hr = IULoadModel(handle, IUTask_Detection, CharToWchar(trained_filename.c_str()));
+	const wchar_t* modelConfigFile = CharToWchar(trained_filename.c_str());
+	int tasks = 2; //detection
+	CImageRecognition* ir = (CImageRecognition*)handle;
+	ir->LoadModel(std::wstring(modelConfigFile), tasks);
+
+	// Copying Features conv layers to Caffe NetParameters
+	cout << "=====================Copying Features conv layers to Caffe NetParameters" << endl;
+	CopyMSRAParams(ir->m_featureMap.m_netConvs.m_layers);
+
+	// Copying RPN conv layers to Caffe NetParameters
+	cout << "=====================Copying RPN conv layers to Caffe NetParameters" << endl;
+	CopyMSRAParams(ir->m_detector.m_boxProposal.m_net.m_layers);
+
+	// Copying RPN FC layers to Caffe NetParameters
+	cout << "=====================Copying RPN FC layers to Caffe NetParameters" << endl;
+	CopyMSRAParams(ir->m_detector.m_netFcs.m_layers);
+	/*
+	const int num_conv_layers = ir->m_featureMap.m_netConvs.m_layers.size();
+	for (int i = 0; i < num_conv_layers; i++)
+	{
+		DNNTestLib::Layer* layer = ir->m_featureMap.m_netConvs.m_layers[i];
+		string layerType = layer->GetType();
+		string source_layer_name = layer->GetName();
+		int channels, width, height, num;
+		layer->GetResponseDim(&channels, &width, &height, &num);	
+		std::cout << "Name:" << source_layer_name << ",  Output: (channels, width, height, num)= (" << channels << "," << width << "," << height << "," << num << ")" << std::endl;
+		cout << "Type:" << layerType << endl;
+		float* weights;
+		if (layerType == "conv")
+		{
+			int weight_size = layer->GetWeight()->GetDataSize();
+			int wchan, wwid, wheight, wnum;
+			wchan = layer->GetWeight()->GetChannels(); wwid = layer->GetWeight()->GetWidth();wheight = layer->GetWeight()->GetHeight(); wnum = layer->GetWeight()->GetNum();
+			std::cout << "Type:" << layerType << ":  Weight: (channels, width, height, num)= (" << wchan << "," << wwid << "," << wheight << "," << wnum << ")" << std::endl;
+			float* weight_buffer = new float[weight_size];
+			layer->CopyWeight(weight_buffer, weight_size);
+			int bias_size = layer->GetBias()->GetDataSize();
+			float* bias_buffer = new float[bias_size];
+			layer->CopyBias(bias_buffer, bias_size);
+			////////////////////////////////////////////////////////////////////////////////////////
+			// Copying to Caffe NetParameters
+			////////////////////////////////////////////////////////////////////////////////////////
+			if (!layer_names_index_.count(source_layer_name)) {
+				LOG(INFO) << "Ignoring source layer " << source_layer_name;
+				continue;
+			}
+			int target_layer_id = layer_names_index_[source_layer_name];
+			DLOG(INFO) << "Copying source layer " << source_layer_name;
+			vector<shared_ptr<Blob<Dtype> > >& target_blobs =
+				layers_[target_layer_id]->blobs();
+			for (int j = 0; j < target_blobs.size(); ++j) {
+				shared_ptr<Blob<Dtype>>& targetBlobPtr = target_blobs[j];
+				Blob<Dtype>* targetBlob = targetBlobPtr.get();
+				int target_size = targetBlob->num()*targetBlob->channels()*targetBlob->height()*targetBlob->width();				
+				Dtype* data_vec = targetBlob->mutable_cpu_data();
+				if (j == 0)// weights
+				{
+					CHECK_EQ(target_size, weight_size);
+					for (int i = 0; i < targetBlob->count(); ++i)
+						data_vec[i] = weight_buffer[i];
+				}
+				else if (j == 1) //bias
+				{
+					CHECK_EQ(target_size, bias_size);
+					for (int i = 0; i < targetBlob->count(); ++i)
+						data_vec[i] = bias_buffer[i];
+				}
+			}
+		}
+	}
+	////////////////////////////////////////////////////////////////////////////////////////
+	// Copying RPN conv layers to Caffe NetParameters
+	////////////////////////////////////////////////////////////////////////////////////////
+	const int num_conv_layers = ir->m_detector.m_boxProposal.m_net.m_layers.size();
+	for (int i = 0; i < num_conv_layers; i++)
+	{
+		DNNTestLib::Layer* layer = ir->m_featureMap.m_netConvs.m_layers[i];
+		string layerType = layer->GetType();
+		string source_layer_name = layer->GetName();
+		int channels, width, height, num;
+		layer->GetResponseDim(&channels, &width, &height, &num);
+		std::cout << "Name:" << source_layer_name << ",  Output: (channels, width, height, num)= (" << channels << "," << width << "," << height << "," << num << ")" << std::endl;
+		cout << "Type:" << layerType << endl;
+		float* weights;
+		if (layerType == "conv")
+		{
+			int weight_size = layer->GetWeight()->GetDataSize();
+			int wchan, wwid, wheight, wnum;
+			wchan = layer->GetWeight()->GetChannels(); wwid = layer->GetWeight()->GetWidth(); wheight = layer->GetWeight()->GetHeight(); wnum = layer->GetWeight()->GetNum();
+			std::cout << "Type:" << layerType << ":  Weight: (channels, width, height, num)= (" << wchan << "," << wwid << "," << wheight << "," << wnum << ")" << std::endl;
+			float* weight_buffer = new float[weight_size];
+			layer->CopyWeight(weight_buffer, weight_size);
+			int bias_size = layer->GetBias()->GetDataSize();
+			float* bias_buffer = new float[bias_size];
+			layer->CopyBias(bias_buffer, bias_size);
+			////////////////////////////////////////////////////////////////////////////////////////
+			// Copying to Caffe NetParameters
+			////////////////////////////////////////////////////////////////////////////////////////
+			if (!layer_names_index_.count(source_layer_name)) {
+				LOG(INFO) << "Ignoring source layer " << source_layer_name;
+				continue;
+			}
+			int target_layer_id = layer_names_index_[source_layer_name];
+			DLOG(INFO) << "Copying source layer " << source_layer_name;
+			vector<shared_ptr<Blob<Dtype> > >& target_blobs =
+				layers_[target_layer_id]->blobs();
+			for (int j = 0; j < target_blobs.size(); ++j) {
+				shared_ptr<Blob<Dtype>>& targetBlobPtr = target_blobs[j];
+				Blob<Dtype>* targetBlob = targetBlobPtr.get();
+				int target_size = targetBlob->num()*targetBlob->channels()*targetBlob->height()*targetBlob->width();
+				Dtype* data_vec = targetBlob->mutable_cpu_data();
+				if (j == 0)// weights
+				{
+					CHECK_EQ(target_size, weight_size);
+					for (int i = 0; i < targetBlob->count(); ++i)
+						data_vec[i] = weight_buffer[i];
+				}
+				else if (j == 1) //bias
+				{
+					CHECK_EQ(target_size, bias_size);
+					for (int i = 0; i < targetBlob->count(); ++i)
+						data_vec[i] = bias_buffer[i];
+				}
+			}
+		}
+	}
+	////////////////////////////////////////////////////////////////////////////////////////
+	// Copying FC layers to Caffe NetParameters
+	////////////////////////////////////////////////////////////////////////////////////////
+	const int num_fc_layers = ir->m_detector.m_netFcs.m_layers.size();
+	for (int i = 0; i < num_fc_layers; i++)
+	{
+		DNNTestLib::Layer* layer = ir->m_detector.m_netFcs.m_layers[i];
+		string layerType = layer->GetType();
+		string source_layer_name = layer->GetName();
+		int channels, width, height, num;
+		layer->GetResponseDim(&channels, &width, &height, &num);
+		std::cout << "Name:" << source_layer_name << ",  Output: (channels, width, height, num)= (" << channels << "," << width << "," << height << "," << num << ")" << std::endl;
+		cout << "Type:" << layerType << endl;
+		float* weights;
+		if (layerType == "fc")
+		{
+			int weight_size = layer->GetWeight()->GetDataSize();
+			int wchan, wwid, wheight, wnum;
+			wchan = layer->GetWeight()->GetChannels(); wwid = layer->GetWeight()->GetWidth(); wheight = layer->GetWeight()->GetHeight(); wnum = layer->GetWeight()->GetNum();
+			std::cout << "Type:" << layerType << ":  Weight: (channels, width, height, num)= (" << wchan << "," << wwid << "," << wheight << "," << wnum << ")" << std::endl;
+			float* weight_buffer = new float[weight_size];
+			layer->CopyWeight(weight_buffer, weight_size);
+			int bias_size = layer->GetBias()->GetDataSize();
+			float* bias_buffer = new float[bias_size];
+			layer->CopyBias(bias_buffer, bias_size);
+			////////////////////////////////////////////////////////////////////////////////////////
+			// Copying to Caffe NetParameters
+			////////////////////////////////////////////////////////////////////////////////////////
+			if (!layer_names_index_.count(source_layer_name)) {
+				LOG(INFO) << "Ignoring source layer " << source_layer_name;
+				continue;
+			}
+			int target_layer_id = layer_names_index_[source_layer_name];
+			DLOG(INFO) << "Copying source layer " << source_layer_name;
+			vector<shared_ptr<Blob<Dtype> > >& target_blobs =
+				layers_[target_layer_id]->blobs();
+			for (int j = 0; j < target_blobs.size(); ++j) {
+				shared_ptr<Blob<Dtype>>& targetBlobPtr = target_blobs[j];
+				Blob<Dtype>* targetBlob = targetBlobPtr.get();
+				int target_size = targetBlob->num()*targetBlob->channels()*targetBlob->height()*targetBlob->width();
+				Dtype* data_vec = targetBlob->mutable_cpu_data();
+				if (j == 0)// weights
+				{
+					CHECK_EQ(target_size, weight_size);
+					for (int i = 0; i < targetBlob->count(); ++i)
+						data_vec[i] = weight_buffer[i];
+				}
+				else if (j == 1) //bias
+				{
+					CHECK_EQ(target_size, bias_size);
+					for (int i = 0; i < targetBlob->count(); ++i)
+						data_vec[i] = bias_buffer[i];
+				}
+			}
+		}
+	}
+	*/
 }
 
 template <typename Dtype>

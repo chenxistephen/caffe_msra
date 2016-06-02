@@ -1,5 +1,5 @@
 #pragma once
-
+#define NOMINMAX
 #include <Windows.h>
 #include <vector>
 #include <iostream>
@@ -29,8 +29,7 @@ public:
 	HRESULT GetFeatureMap(const vt::CRGBByteImg &image,
 		__out DNNTestLib::CPUData &convFeatureMap);
 
-private:
 
-private:
+public:// private:
 	DNNTestLib::DNNTester m_netConvs;
 };

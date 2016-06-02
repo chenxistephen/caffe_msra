@@ -73,6 +73,28 @@ void ConvLayer::InitActs()
 		m_layerActs->Resize(num, m_weight->GetNum(), output_width, output_height, m_min_pad_x, m_min_pad_y, CPUData::CWHN);
 }
 
+/////////////////////////////////////////
+CPUData* ConvLayer::GetWeight() const
+{
+	return m_weight;
+}
+
+CPUData* ConvLayer::GetBias() const
+{
+	return m_biases;
+}
+
+void ConvLayer::CopyWeight(float *buffer, int buffer_size) const
+{
+	m_weight->GetData(buffer, buffer_size);
+}
+
+void ConvLayer::CopyBias(float *buffer, int buffer_size) const
+{
+	m_biases->GetData(buffer, buffer_size);
+}
+////////////////////////////////////////
+
 void ConvLayer::Forward()
 {
 	CPUData *input = m_inputs[0]->GetActs();

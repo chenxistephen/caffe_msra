@@ -60,6 +60,28 @@ void FCLayer::InitActs()
 		m_layerActs->Resize(input->GetNum(), m_weight->GetNum(), 1, 1, 0, 0);
 }
 
+/////////////////////////////////////////
+CPUData* FCLayer::GetWeight() const
+{
+	return m_weight;
+}
+
+CPUData* FCLayer::GetBias() const
+{
+	return m_biases;
+}
+
+void FCLayer::CopyWeight(float *buffer, int buffer_size) const
+{
+	m_weight->GetData(buffer, buffer_size);
+}
+
+void FCLayer::CopyBias(float *buffer, int buffer_size) const
+{
+	m_biases->GetData(buffer, buffer_size);
+}
+////////////////////////////////////////
+
 void FCLayer::Forward()
 {
 	CPUData *input = m_inputs[0]->GetActs();

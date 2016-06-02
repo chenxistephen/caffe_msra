@@ -46,7 +46,7 @@ namespace DNNTestLib
 		static CPUData* Create(int num, int channels, int width, int height, int padding_x = 0, int padding_y = 0, DataStorageType dst = DataStorageType::CWHN);
 		static CPUData* CreateFromDump(std::istream &stream);
 
-	private:
+	public://private:
 		CPUData(const CPUData &);
 		const CPUData& operator = (const CPUData &);
 		int Offset(int num, int channels, int width, int height) const;

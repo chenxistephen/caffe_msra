@@ -1,3 +1,4 @@
+#define NOMINMAX
 #include <Windows.h>
 #include "direct.h"
 #include <tchar.h>
@@ -128,7 +129,7 @@ int ObjectDetectionLibraryWrapper::LoadModel()
 	return 0;
 }
 
-int main()
+int _main()
 {
 	const char* modelConfigFilePath = "E:\\chenxi\\ImageRecognitionSDK\\model\\MultiTasks\\Zeiler_conv5_c1s5n64c2n192\\Cloth_config_detection.txt";
 	const char* modelCategoriesFilePath = "E:\\chenxi\\ImageRecognitionSDK\\model\\MultiTasks\\Zeiler_conv5_c1s5n64c2n192\\Cloth_detection_label.txt";

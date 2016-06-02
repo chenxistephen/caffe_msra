@@ -43,7 +43,7 @@ namespace DNNTestLib
 		void Load(const char *buffer, int buffer_size, int &bytes_read);
 		void Clear();
 		
-	private:
+	public://private:
 		// attributes
 		std::vector<Layer *> m_layers;
 		DataLayer *m_data_layer;

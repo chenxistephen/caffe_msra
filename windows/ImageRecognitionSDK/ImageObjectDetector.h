@@ -1,5 +1,5 @@
 #pragma once
-
+#define NOMINMAX
 #include <Windows.h>
 #include <vector>
 
@@ -80,7 +80,7 @@ private:
 
 	GetObjectInfoCountFun m_getObjectInfoCountFun;
 
-private:
+public://private:
 	DNNTestLib::DNNTester m_netFcs;
 	DNNTestLib::CSpmPooler m_sppPooler;
 	DNNTestLib::CBoxProposal m_boxProposal;

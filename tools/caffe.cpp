@@ -15,6 +15,10 @@ namespace bp = boost::python;
 #include "caffe/caffe.hpp"
 #include "caffe/util/signal_handler.h"
 
+#include "caffe/solver.hpp"
+#include "caffe/util/format.hpp"
+#include "caffe/util/io.hpp"
+
 using caffe::Blob;
 using caffe::Caffe;
 using caffe::Net;
@@ -255,6 +259,15 @@ int test() {
   // Instantiate the caffe net.
   Net<float> caffe_net(FLAGS_model, caffe::TEST);
   caffe_net.CopyTrainedLayersFrom(FLAGS_weights);
+  caffe::NetParameter net_param;
+  caffe_net.ToProto(&net_param, false);
+  string model_filename = "E:\\chenxi\\data\\MSN\\MSRAModel.caffemodel";
+  LOG(INFO) << "Snapshot to  " << model_filename;
+  WriteProtoToBinaryFile(net_param, model_filename);
+  //string model_txtname = "E:\\chenxi\\data\\MSN\\MSRAModel.txt";
+  //LOG(INFO) << "Snapshot to  " << model_txtname;
+  //WriteProtoToTextFile(net_param, model_txtname);
+  return 0;
   LOG(INFO) << "Running for " << FLAGS_iterations << " iterations.";
 
   vector<Blob<float>* > bottom_vec;
