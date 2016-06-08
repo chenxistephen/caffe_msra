@@ -981,17 +981,54 @@ void Net<Dtype>::CopyMSRAParams(const std::vector<DNNTestLib::Layer*>& layers)
 				{
 					CHECK_EQ(target_size, weight_size);
 					cout << "Storage Type: " << src_weight->GetDataStorageType() << endl;
-					for (int n = 0; n < wnum; n++)
+					if (source_layer_name == "fc6")
 					{
-						for (int c = 0; c < wchan; c++)
+						// for fc: channel:= input_dim, num:= output_dim
+						std::map<int, int> fc6map; // map from CWHN to WHCN
+						for (int c = 0; c < 256; c++)
 						{
-							for (int h = 0; h < wheight; h++)
+							for (int h = 0; h < 6; h++)
 							{
-								for (int w = 0; w < wwid; w++)
+								for (int w = 0; w < 6; w++)
 								{
-									int tid = targetBlob->offset(n, c, h, w);
-									int sid = src_weight->Offset(n, c, w, h);
-									data_vec[tid] = weight_buffer[sid];
+									int sid = (h * 6 + w) * 256 + c;
+									int tid = (c * 6 + h) * 6 + w;
+									fc6map[sid] = tid;
+								}
+							}
+						}
+						///////
+						for (int n = 0; n < wnum; n++)
+						{
+							for (int c = 0; c < wchan; c++)
+							{
+								int tgt_chan = fc6map[c];
+								for (int h = 0; h < wheight; h++)
+								{
+									for (int w = 0; w < wwid; w++)
+									{
+										int tid = targetBlob->offset(n, tgt_chan, h, w);
+										int sid = src_weight->Offset(n, c, w, h);
+										data_vec[tid] = weight_buffer[sid];
+									}
+								}
+							}
+						}
+					}
+					else// if (layerType == "conv")
+					{
+						for (int n = 0; n < wnum; n++)
+						{
+							for (int c = 0; c < wchan; c++)
+							{
+								for (int h = 0; h < wheight; h++)
+								{
+									for (int w = 0; w < wwid; w++)
+									{
+										int tid = targetBlob->offset(n, c, h, w);
+										int sid = src_weight->Offset(n, c, w, h);
+										data_vec[tid] = weight_buffer[sid];
+									}
 								}
 							}
 						}
@@ -1003,6 +1040,7 @@ void Net<Dtype>::CopyMSRAParams(const std::vector<DNNTestLib::Layer*>& layers)
 				{
 					CHECK_EQ(target_size, bias_size);
 					cout << "Storage Type: " << src_bias->GetDataStorageType() << endl;
+
 					for (int n = 0; n < bnum; n++)
 					{
 						for (int c = 0; c < bchan; c++)
@@ -1017,7 +1055,7 @@ void Net<Dtype>::CopyMSRAParams(const std::vector<DNNTestLib::Layer*>& layers)
 								}
 							}
 						}
-					}
+					}					
 					//for (int i = 0; i < targetBlob->count(); ++i)
 					//	data_vec[i] = bias_buffer[i];
 				}
